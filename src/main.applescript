@@ -23,9 +23,11 @@ set allTracksIdList to {}
 set deadTrackListDialog to {}
 set deadTrackIdList to {}
 
+display dialog "Caution!" & return & return & "This app will search your library for missing files and remove them. It might take a moment." buttons {"Cancel", "Procede..."} default button 1 with icon 2
+
 tell application "iTunes"
-	# set allTracks to every track
-	set allTracks to (every track of playlist "My Top Rated")
+	set allTracks to every track
+	# set allTracks to (every track of playlist "My Top Rated")
 	
 	repeat with i from 1 to (length of allTracks)
 		set currentItem to item i of allTracks
@@ -36,33 +38,39 @@ tell application "iTunes"
 		set currentItemId to did
 		
 		try
-			tell application "System Events"
-				if not exists file qloc then
-					copy currentItemText to deadTrackListDialog
-					copy currentItemId to deadTrackIdList
+			tell me
+				if not is_file(qloc) then
+					copy currentItemText to end of deadTrackListDialog
+					copy currentItemId to end of deadTrackIdList
 				end if
 			end tell
 		on error errMsg number errNumber
 			display dialog "Debug: " & errMsg buttons {"OK"} with icon caution
 		end try
-		# delete (some track of library playlist 1 whose database ID is dbid)
-		# set currentItemText to (tid as string) & " " & (did as string)
-		# & " " & n & " - " & al & " - " & ar
-		# set currentItemId to tid
 		
 		copy currentItemText to end of allTracksListDialog
 		copy currentItemId to end of allTracksIdList
 		
 	end repeat
 	
-	choose from list allTracksListDialog with title "All tracks:" default items deadTrackListDialog with multiple selections allowed
+	set dialogResult to display dialog "Found " & ((length of deadTrackIdList) as string) & " tracks without files. Delete?" with icon note
 	
-	if the result is not false then
-		delete_tracks(result)
+	if button returned of dialogResult is "OK" then
+		set deletedCount to 0
+		try
+			repeat with curTrack in deadTrackIdList
+				delete (some track of library playlist 1 whose database ID is curTrack)
+				set deletedCount to deletedCount + 1
+			end repeat
+		on error errMsg number errNum
+			display dialog "Error: Could not delete track id " & (curTrack as string) & " - " & errMsg buttons {"OK"} with icon caution
+		end try
+		display dialog (deletedCount as string) & " tracks deleted" buttons {"OK"} with icon note
 	else
-		error number -64
+		display dialog "nothing to do"
 		return
 	end if
+	
 end tell
 
 on delete_tracks(track_list)
